@@ -968,8 +968,7 @@ create table if not exists public.contract_payment_plan (
   position    integer not null default 0,
   created_at  timestamptz not null default now()
 );
--- Link an installment to the actual payment recorded when it is marked collected.
-alter table public.contract_payment_plan add column if not exists payment_id uuid references public.contract_payments (id) on delete set null;
+-- (payment_id FK moved to end of file: references contract_payments, created later.)
 create index if not exists contract_payment_plan_contract_idx on public.contract_payment_plan (contract_id);
 alter table public.contract_payment_plan enable row level security;
 drop policy if exists contract_payment_plan_owner_all on public.contract_payment_plan;
@@ -1402,3 +1401,8 @@ alter table public.studio_expenses add column if not exists client_visible boole
 alter table public.contract_templates drop constraint if exists contract_templates_shoot_type_check;
 alter table public.contract_templates add constraint contract_templates_shoot_type_check
   check (shoot_type in ('photo', 'video', 'both', 'psc', 'makeup', 'rental', 'prewedding', 'wedding', 'other'));
+
+-- Link an instalment to the actual payment recorded when it is marked collected.
+-- (Originally near contract_payment_plan but references contract_payments, which
+-- is created later — relocated here so a fresh DB build succeeds.)
+alter table public.contract_payment_plan add column if not exists payment_id uuid references public.contract_payments (id) on delete set null;
