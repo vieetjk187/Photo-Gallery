@@ -257,7 +257,6 @@ create index if not exists albums_gallery_idx on public.albums (is_gallery, stat
 -- Video support + per-account gallery permission + admin-curated featured photos
 alter table public.photos add column if not exists is_video boolean not null default false;
 alter table public.profiles add column if not exists can_galleries boolean not null default false;
-alter table public.site_settings add column if not exists featured_images text[] not null default '{}';
 alter table public.albums add column if not exists download_enabled boolean not null default true;
 
 -- ============================================================================
@@ -812,13 +811,7 @@ alter table public.studio_contracts add column if not exists brief_submitted_at 
 
 -- Lead source (nguồn khách) for the CRM + per-contract direct expenses.
 alter table public.studio_contracts add column if not exists source text; -- facebook | referral | google | walk_in | returning | other
--- Reuse studio_expenses for per-contract costs too (null contract_id = general).
-alter table public.studio_expenses add column if not exists contract_id uuid references public.studio_contracts (id) on delete set null;
-create index if not exists studio_expenses_contract_idx on public.studio_expenses (contract_id);
--- Whether a per-contract expense is a client-facing surcharge (shown + billed on
--- the client portal) or an internal-only cost (profit/loss only). Defaults true
--- to preserve existing billing; uncheck to keep a cost private to the studio.
-alter table public.studio_expenses add column if not exists client_visible boolean not null default true;
+-- (Moved to end of file: studio_expenses ALTERs ran before its CREATE TABLE.)
 
 -- Prepaid session packages / combo cards (thẻ buổi trả trước) per client.
 create table if not exists public.studio_packages (
@@ -902,9 +895,7 @@ alter table public.profiles add column if not exists auto_client_emails boolean 
 alter table public.studio_contracts drop constraint if exists studio_contracts_shoot_type_check;
 alter table public.studio_contracts add constraint studio_contracts_shoot_type_check
   check (shoot_type in ('photo', 'video', 'both', 'psc', 'makeup', 'rental', 'prewedding', 'wedding', 'other'));
-alter table public.contract_templates drop constraint if exists contract_templates_shoot_type_check;
-alter table public.contract_templates add constraint contract_templates_shoot_type_check
-  check (shoot_type in ('photo', 'video', 'both', 'psc', 'makeup', 'rental', 'prewedding', 'wedding', 'other'));
+-- (Moved to end of file: contract_templates constraint ran before its CREATE TABLE.)
 
 create table if not exists public.studio_bookings (
   id             uuid primary key default gen_random_uuid(),
@@ -1395,3 +1386,19 @@ alter table public.studio_quotes add column if not exists bulk_discount_min_item
 -- package). If the client selects the studio's designated package
 -- (discount_package_group), bulk_discount_amount is knocked off the total.
 alter table public.studio_quotes add column if not exists discount_package_group text null;
+
+-- ============================================================================
+-- Relocated migrations: these ALTER/INDEX statements originally appeared
+-- earlier in the file, before their target table's CREATE TABLE, which made
+-- the script fail on a brand-new (empty) database. They run safely here once
+-- every table exists. All are idempotent (if not exists / drop-then-add).
+-- ============================================================================
+alter table public.site_settings add column if not exists featured_images text[] not null default '{}';
+
+alter table public.studio_expenses add column if not exists contract_id uuid references public.studio_contracts (id) on delete set null;
+create index if not exists studio_expenses_contract_idx on public.studio_expenses (contract_id);
+alter table public.studio_expenses add column if not exists client_visible boolean not null default true;
+
+alter table public.contract_templates drop constraint if exists contract_templates_shoot_type_check;
+alter table public.contract_templates add constraint contract_templates_shoot_type_check
+  check (shoot_type in ('photo', 'video', 'both', 'psc', 'makeup', 'rental', 'prewedding', 'wedding', 'other'));
